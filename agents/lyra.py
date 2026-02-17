@@ -13,6 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
+logger = logging.getLogger(__name__)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -38,25 +39,25 @@ def check_environment() -> tuple[bool, str]:
 
 def check_apis() -> tuple[bool, str]:
     """Verify external APIs are reachable."""
-    
-    import requests
-    
+
+    from config.http_client import resilient_get
+
     # Check AlphaFold
     try:
-        r = requests.get("https://alphafold.ebi.ac.uk/api/prediction/Q8I3H7", timeout=10)
+        r = resilient_get("https://alphafold.ebi.ac.uk/api/prediction/Q8I3H7", timeout_key="alphafold_metadata")
         if r.status_code != 200:
             return False, f"AlphaFold API returned {r.status_code}"
     except Exception as e:
         return False, f"AlphaFold API unreachable: {e}"
-    
+
     # Check UniProt
     try:
-        r = requests.get("https://rest.uniprot.org/uniprotkb/Q8I3H7.json", timeout=10)
+        r = resilient_get("https://rest.uniprot.org/uniprotkb/Q8I3H7.json", timeout_key="uniprot_search")
         if r.status_code != 200:
             return False, f"UniProt API returned {r.status_code}"
     except Exception as e:
         return False, f"UniProt API unreachable: {e}"
-    
+
     return True, "APIs OK"
 
 
@@ -127,19 +128,19 @@ def health_check() -> dict:
     Run a complete health check of the system.
     """
     
-    print("🔍 Running Lyra health check...\n")
-    
+    logger.info("Running Lyra health check...")
+
     checks = {}
-    
+
     # Environment
     env_ok, env_msg = check_environment()
     checks["environment"] = {"ok": env_ok, "message": env_msg}
-    print(f"  {'✓' if env_ok else '✗'} Environment: {env_msg}")
-    
+    logger.info("  %s Environment: %s", "OK" if env_ok else "FAIL", env_msg)
+
     # APIs
     api_ok, api_msg = check_apis()
     checks["apis"] = {"ok": api_ok, "message": api_msg}
-    print(f"  {'✓' if api_ok else '✗'} External APIs: {api_msg}")
+    logger.info("  %s External APIs: %s", "OK" if api_ok else "FAIL", api_msg)
     
     # Azure OpenAI
     if env_ok:
@@ -148,7 +149,7 @@ def health_check() -> dict:
             client = AzureOpenAI(
                 azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
                 api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-                api_version="2024-02-15-preview",
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
                 timeout=60.0,
                 max_retries=3,
             )
@@ -158,14 +159,14 @@ def health_check() -> dict:
                 max_tokens=5
             )
             checks["azure_openai"] = {"ok": True, "message": "Connected"}
-            print(f"  ✓ Azure OpenAI: Connected")
+            logger.info("  OK Azure OpenAI: Connected")
         except Exception as e:
             checks["azure_openai"] = {"ok": False, "message": str(e)}
-            print(f"  ✗ Azure OpenAI: {e}")
-    
+            logger.error("  FAIL Azure OpenAI: %s", e)
+
     # Overall
     all_ok = all(c["ok"] for c in checks.values())
-    print(f"\n{'✓ All systems operational' if all_ok else '✗ Some checks failed'}")
+    logger.info("All systems operational" if all_ok else "Some checks failed")
     
     return {"healthy": all_ok, "checks": checks}
 
@@ -173,35 +174,34 @@ def health_check() -> dict:
 def interactive():
     """Run Lyra in interactive mode."""
     
-    print("═" * 60)
-    print("  LYRA - Protein Reasoning System")
-    print("  Type 'quit' to exit, 'health' to check system status")
-    print("═" * 60)
-    
+    logger.info("═" * 60)
+    logger.info("  LYRA - Protein Reasoning System")
+    logger.info("  Type 'quit' to exit, 'health' to check system status")
+    logger.info("═" * 60)
+
     while True:
-        print()
-        question = input("❓ Your question: ").strip()
-        
+        question = input("\nYour question: ").strip()
+
         if not question:
             continue
-        
+
         if question.lower() in ["quit", "exit", "q"]:
-            print("Goodbye!")
+            logger.info("Goodbye!")
             break
-        
+
         if question.lower() == "health":
             health_check()
             continue
-        
+
         result = run_safe(question)
-        
+
         if result["success"]:
-            print(result["result"])
-            print(f"\n⏱️  Completed in {result['duration_seconds']:.1f} seconds")
+            logger.info(result["result"])
+            logger.info("Completed in %.1f seconds", result['duration_seconds'])
         else:
-            print(result["result"])
+            logger.error(result["result"])
             if result.get("error") and os.getenv("DEBUG"):
-                print(f"\nDebug info:\n{result['error']}")
+                logger.debug("Debug info:\n%s", result['error'])
 
 
 # Test
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         # Command line mode
         question = " ".join(sys.argv[1:])
         result = run_safe(question)
-        print(result["result"])
+        logger.info(result["result"])
     else:
         # Interactive mode
         interactive()

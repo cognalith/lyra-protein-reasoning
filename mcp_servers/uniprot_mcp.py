@@ -5,12 +5,15 @@ Provides tools for searching and fetching protein data from UniProt.
 
 import sys
 import os
+import logging
 from typing import Optional, List
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from config.http_client import resilient_get
+
+logger = logging.getLogger(__name__)
 
 UNIPROT_API = "https://rest.uniprot.org/uniprotkb"
 
@@ -274,32 +277,30 @@ def _extract_cross_refs(entry: dict) -> dict:
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("UNIPROT MCP SERVER TEST")
-    print("=" * 60)
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     # Test 1: Search by organism
-    print("\n📡 Test 1: Search for Plasmodium falciparum proteins")
+    logger.info("Test 1: Search for Plasmodium falciparum proteins")
     results = search_by_organism("Plasmodium falciparum", keyword="membrane", limit=5)
     for r in results[:3]:
         if "error" not in r:
-            print(f"  - {r['uniprot_id']}: {r['protein_name'][:50]}...")
-    
+            logger.info("  - %s: %s...", r['uniprot_id'], r['protein_name'][:50])
+
     # Test 2: Get protein details
-    print("\n📡 Test 2: Get details for Q8I3H7")
+    logger.info("Test 2: Get details for Q8I3H7")
     details = get_protein_details("Q8I3H7")
     if "error" not in details:
-        print(f"  Name: {details['protein_name']}")
-        print(f"  Organism: {details['organism']}")
-        print(f"  Function: {details['function'][:100]}...")
-        print(f"  GO terms: {len(details['go_terms'])}")
-        print(f"  Domains: {len(details['domains'])}")
-    
+        logger.info("  Name: %s", details['protein_name'])
+        logger.info("  Organism: %s", details['organism'])
+        logger.info("  Function: %s...", details['function'][:100])
+        logger.info("  GO terms: %d", len(details['go_terms']))
+        logger.info("  Domains: %d", len(details['domains']))
+
     # Test 3: Search drug targets
-    print("\n📡 Test 3: Search potential drug targets")
+    logger.info("Test 3: Search potential drug targets")
     targets = search_drug_targets("Plasmodium falciparum", limit=5)
     for t in targets[:3]:
         if "error" not in t:
-            print(f"  - {t['uniprot_id']}: {t['protein_name'][:50]}...")
-    
-    print("\n✓ UniProt MCP Server ready")
+            logger.info("  - %s: %s...", t['uniprot_id'], t['protein_name'][:50])
+
+    logger.info("UniProt MCP Server ready")

@@ -6,6 +6,7 @@ Challenges reasoning, cross-references data, identifies contradictions.
 import os
 import sys
 import json
+import logging
 import requests
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,11 +17,13 @@ from config.http_client import resilient_get
 client = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version="2024-02-15-preview",
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
     timeout=60.0,
     max_retries=3,
 )
 MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+
+logger = logging.getLogger(__name__)
 
 
 def get_uniprot_annotations(uniprot_id: str) -> dict:
@@ -151,11 +154,11 @@ def critique_reasoning(uniprot_id: str, reasoning_result: dict) -> dict:
     """
     
     # Get external evidence from UniProt
-    print("  → Fetching UniProt annotations...")
+    logger.info("Fetching UniProt annotations...")
     uniprot_data = get_uniprot_annotations(uniprot_id)
     
     if "error" in uniprot_data:
-        print(f"  ⚠ UniProt fetch failed: {uniprot_data['error']}")
+        logger.warning("UniProt fetch failed: %s", uniprot_data['error'])
         uniprot_context = "UniProt data unavailable for cross-reference."
     else:
         uniprot_context = f"""
@@ -181,7 +184,7 @@ Critique the reasoning above. Are the conclusions supported by evidence?
 """
     
     # Get critique
-    print("  → Calling LLM for critique...")
+    logger.info("Calling LLM for critique...")
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -192,12 +195,12 @@ Critique the reasoning above. Are the conclusions supported by evidence?
     )
     
     raw = response.choices[0].message.content
-    print(f"  → Got response ({len(raw)} chars)")
-    
+    logger.info("Got response (%d chars)", len(raw))
+
     try:
         critique = parse_json_response(raw)
     except json.JSONDecodeError:
-        print("  ⚠ JSON parse failed")
+        logger.warning("JSON parse failed for critique response")
         critique = {"raw_critique": raw}
     
     return {
@@ -259,17 +262,14 @@ def generate_critique_report(uniprot_id: str, reasoning_result: dict) -> str:
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("CRITIC AGENT TEST")
-    print("=" * 60)
-    print()
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     # First, run the reasoning agent to get something to critique
     from reasoning_agent import reason_about_target
-    
-    print("Step 1: Running Reasoning Agent...")
+
+    logger.info("Step 1: Running Reasoning Agent...")
     reasoning_result = reason_about_target("Q8I3H7")
-    
-    print("\nStep 2: Running Critic Agent...")
+
+    logger.info("Step 2: Running Critic Agent...")
     report = generate_critique_report("Q8I3H7", reasoning_result)
-    print(report)
+    logger.info(report)

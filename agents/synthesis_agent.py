@@ -6,6 +6,7 @@ Compiles all agent outputs into a structured research brief.
 import os
 import sys
 import json
+import logging
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,11 +16,13 @@ from openai import AzureOpenAI
 client = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version="2024-02-15-preview",
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
     timeout=60.0,
     max_retries=3,
 )
 MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+
+logger = logging.getLogger(__name__)
 
 
 SYNTHESIS_PROMPT = """You are the Synthesis Agent for Lyra, a protein research system.
@@ -114,7 +117,7 @@ UNIPROT ANNOTATIONS (external validation):
 Synthesize all of the above into a final research brief for protein {uniprot_id}.
 """
     
-    print("  → Calling LLM for synthesis...")
+    logger.info("Calling LLM for synthesis...")
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -125,12 +128,12 @@ Synthesize all of the above into a final research brief for protein {uniprot_id}
     )
     
     raw = response.choices[0].message.content
-    print(f"  → Got response ({len(raw)} chars)")
-    
+    logger.info("Got response (%d chars)", len(raw))
+
     try:
         synthesis = parse_json_response(raw)
     except json.JSONDecodeError:
-        print("  ⚠ JSON parse failed")
+        logger.warning("JSON parse failed for synthesis response")
         synthesis = {"raw_synthesis": raw}
     
     return {
@@ -269,32 +272,29 @@ def generate_research_brief(
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("SYNTHESIS AGENT TEST")
-    print("=" * 60)
-    print()
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     # Import other agents
     from mcp_servers.alphafold_mcp import summarize_protein
     from structure_agent import analyze_confidence_regions
     from reasoning_agent import reason_about_target
     from critic_agent import critique_reasoning
-    
+
     protein_id = "Q8I3H7"
-    
-    print("Step 1: Getting protein summary...")
+
+    logger.info("Step 1: Getting protein summary...")
     protein_summary = summarize_protein(protein_id)
-    
-    print("Step 2: Analyzing structure...")
+
+    logger.info("Step 2: Analyzing structure...")
     structure_analysis = analyze_confidence_regions(protein_id)
-    
-    print("Step 3: Running reasoning...")
+
+    logger.info("Step 3: Running reasoning...")
     reasoning_result = reason_about_target(protein_id)
-    
-    print("Step 4: Running critique...")
+
+    logger.info("Step 4: Running critique...")
     critique_result = critique_reasoning(protein_id, reasoning_result)
-    
-    print("\nStep 5: Synthesizing final brief...")
+
+    logger.info("Step 5: Synthesizing final brief...")
     brief = generate_research_brief(
         protein_id,
         protein_summary,
@@ -302,5 +302,5 @@ if __name__ == "__main__":
         reasoning_result,
         critique_result
     )
-    
-    print("\n" + brief)
+
+    logger.info("\n%s", brief)

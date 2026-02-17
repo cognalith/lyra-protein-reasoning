@@ -6,6 +6,7 @@ Analyzes protein structure confidence and identifies key regions.
 import os
 import sys
 import json
+import logging
 from openai import AzureOpenAI
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,11 +16,27 @@ from mcp_servers.alphafold_mcp import get_protein_prediction, get_plddt_scores
 client = AzureOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version="2024-02-15-preview",
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
     timeout=60.0,
     max_retries=3,
 )
 MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+
+logger = logging.getLogger(__name__)
+
+# pLDDT confidence thresholds
+PLDDT_VERY_HIGH = 90
+PLDDT_HIGH = 70
+PLDDT_LOW = 50
+
+# Minimum contiguous residues for drug target regions
+MIN_DOMAIN_RESIDUES = 20
+MIN_BINDING_SITE_RESIDUES = 30
+
+# Fraction thresholds for quality interpretation
+FRACTION_VERY_HIGH = 0.6
+FRACTION_HIGH = 0.4
+FRACTION_LOW = 0.2
 
 
 def analyze_confidence_regions(uniprot_id: str) -> dict:
@@ -79,11 +96,11 @@ def _identify_regions(scores: list) -> dict:
     very_low = []   # <50
     
     for i, score in enumerate(scores):
-        if score > 90:
+        if score > PLDDT_VERY_HIGH:
             very_high.append(i + 1)  # 1-indexed for biology convention
-        elif score > 70:
+        elif score > PLDDT_HIGH:
             confident.append(i + 1)
-        elif score > 50:
+        elif score > PLDDT_LOW:
             low.append(i + 1)
         else:
             very_low.append(i + 1)
@@ -125,7 +142,7 @@ def _find_drug_target_regions(regions: dict) -> list:
     # Look for substantial high-confidence regions
     for start, end in regions["very_high"]["ranges"]:
         length = end - start + 1
-        if length >= 20:  # At least 20 residues
+        if length >= MIN_DOMAIN_RESIDUES:
             target_regions.append({
                 "start": start,
                 "end": end,
@@ -136,7 +153,7 @@ def _find_drug_target_regions(regions: dict) -> list:
     
     for start, end in regions["confident"]["ranges"]:
         length = end - start + 1
-        if length >= 30:  # Need longer stretch if only confident
+        if length >= MIN_BINDING_SITE_RESIDUES:
             target_regions.append({
                 "start": start,
                 "end": end,
@@ -150,14 +167,14 @@ def _find_drug_target_regions(regions: dict) -> list:
 
 def _interpret_fractions(metadata: dict) -> str:
     """Generate interpretation from fraction data."""
-    very_high = metadata.get("fractionPlddtVeryHigh", 0)
-    very_low = metadata.get("fractionPlddtVeryLow", 0)
+    very_high = metadata.get("fractionPlddtVeryHigh") or 0
+    very_low = metadata.get("fractionPlddtVeryLow") or 0
     
-    if very_high > 0.6:
+    if very_high > FRACTION_VERY_HIGH:
         quality = "excellent"
-    elif very_high > 0.4:
+    elif very_high > FRACTION_HIGH:
         quality = "good"
-    elif very_high > 0.2:
+    elif very_high > FRACTION_LOW:
         quality = "moderate"
     else:
         quality = "poor"
@@ -187,7 +204,7 @@ def generate_structure_report(uniprot_id: str) -> str:
     
     report = [
         f"## Structure Analysis: {uniprot_id}",
-        f"Overall confidence: {analysis['overall_confidence']:.1f}/100",
+        f"Overall confidence: {analysis['overall_confidence']:.1f}/100" if analysis.get('overall_confidence') is not None else "Overall confidence: N/A",
         f"",
         f"### Confidence Distribution",
         analysis["interpretation"],
@@ -204,9 +221,7 @@ def generate_structure_report(uniprot_id: str) -> str:
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("STRUCTURE AGENT TEST")
-    print("=" * 60)
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     report = generate_structure_report("Q8I3H7")
-    print(report)
+    logger.info(report)
