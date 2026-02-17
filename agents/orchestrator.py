@@ -42,6 +42,7 @@ class TaskResult:
     status: str  # "success" | "failed" | "skipped" | "partial"
     result: Any = None
     error: Optional[str] = None
+    error_source: Optional[str] = None  # "error_dict" | "exception" | None
     duration_seconds: float = 0.0
 
     def to_dict(self) -> dict:
@@ -271,6 +272,7 @@ class LyraOrchestrator:
                         task_type=task_type,
                         status="failed",
                         error=error_msg,
+                        error_source="error_dict",
                         duration_seconds=round(duration, 2)
                     ))
                     logger.error(f"Soft failure in {task_type} for {protein}: {error_msg}")
@@ -308,6 +310,7 @@ class LyraOrchestrator:
                     task_type=task_type,
                     status="failed",
                     error=f"{type(e).__name__}: {str(e)}",
+                    error_source="exception",
                     duration_seconds=round(duration, 2)
                 ))
                 logger.error(f"Failed {task_type} for {protein}: {type(e).__name__}: {e}")
