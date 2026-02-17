@@ -39,25 +39,25 @@ def check_environment() -> tuple[bool, str]:
 
 def check_apis() -> tuple[bool, str]:
     """Verify external APIs are reachable."""
-    
-    import requests
-    
+
+    from config.http_client import resilient_get
+
     # Check AlphaFold
     try:
-        r = requests.get("https://alphafold.ebi.ac.uk/api/prediction/Q8I3H7", timeout=10)
+        r = resilient_get("https://alphafold.ebi.ac.uk/api/prediction/Q8I3H7", timeout_key="alphafold_metadata")
         if r.status_code != 200:
             return False, f"AlphaFold API returned {r.status_code}"
     except Exception as e:
         return False, f"AlphaFold API unreachable: {e}"
-    
+
     # Check UniProt
     try:
-        r = requests.get("https://rest.uniprot.org/uniprotkb/Q8I3H7.json", timeout=10)
+        r = resilient_get("https://rest.uniprot.org/uniprotkb/Q8I3H7.json", timeout_key="uniprot_search")
         if r.status_code != 200:
             return False, f"UniProt API returned {r.status_code}"
     except Exception as e:
         return False, f"UniProt API unreachable: {e}"
-    
+
     return True, "APIs OK"
 
 
