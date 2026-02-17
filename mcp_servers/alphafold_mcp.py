@@ -3,8 +3,14 @@ AlphaFold MCP Server
 Provides tools for querying AlphaFold protein structure database.
 """
 
-import requests
+import sys
+import os
 from typing import Optional
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import requests
+from config.http_client import resilient_get
 
 ALPHAFOLD_BASE_URL = "https://alphafold.ebi.ac.uk/api"
 
@@ -20,12 +26,12 @@ def get_protein_prediction(uniprot_id: str) -> dict:
         Protein metadata including confidence scores and structure URLs
     """
     url = f"{ALPHAFOLD_BASE_URL}/prediction/{uniprot_id}"
-    response = requests.get(url)
-    
-    if response.status_code == 404:
-        return {"error": f"Protein {uniprot_id} not found in AlphaFold"}
-    
-    response.raise_for_status()
+    try:
+        response = resilient_get(url, timeout_key="alphafold_metadata")
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return {"error": f"Protein {uniprot_id} not found in AlphaFold"}
+        raise
     data = response.json()
     
     # Return first result (AlphaFold returns a list)
@@ -54,8 +60,7 @@ def get_plddt_scores(uniprot_id: str) -> dict:
     if not plddt_url:
         return {"error": "No pLDDT data available"}
     
-    response = requests.get(plddt_url)
-    response.raise_for_status()
+    response = resilient_get(plddt_url, timeout_key="alphafold_structure")
     return response.json()
 
 
