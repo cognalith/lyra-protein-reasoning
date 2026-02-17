@@ -5,8 +5,14 @@ Clean interface with robust error handling for demos.
 
 import os
 import sys
+import logging
 import traceback
 from datetime import datetime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
