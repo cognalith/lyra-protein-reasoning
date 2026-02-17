@@ -18,7 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from openai import AzureOpenAI
 
 # Import all agents
-from mcp_servers.alphafold_mcp import summarize_protein, get_protein_prediction
+from mcp_servers.alphafold_mcp import get_protein_prediction
+from query_agent import process_protein
 from structure_agent import analyze_confidence_regions
 from reasoning_agent import reason_about_target
 from critic_agent import critique_reasoning
@@ -176,7 +177,7 @@ class LyraOrchestrator:
         
         if task_type == "fetch_protein":
             self.log(f"\n📡 QUERY AGENT: Fetching {protein}...")
-            result = summarize_protein(protein)
+            result = process_protein(protein)
             self.results[f"{protein}_summary"] = result
             return result
             
