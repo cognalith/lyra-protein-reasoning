@@ -24,6 +24,20 @@ MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
 
 logger = logging.getLogger(__name__)
 
+# pLDDT confidence thresholds
+PLDDT_VERY_HIGH = 90
+PLDDT_HIGH = 70
+PLDDT_LOW = 50
+
+# Minimum contiguous residues for drug target regions
+MIN_DOMAIN_RESIDUES = 20
+MIN_BINDING_SITE_RESIDUES = 30
+
+# Fraction thresholds for quality interpretation
+FRACTION_VERY_HIGH = 0.6
+FRACTION_HIGH = 0.4
+FRACTION_LOW = 0.2
+
 
 def analyze_confidence_regions(uniprot_id: str) -> dict:
     """
@@ -82,11 +96,11 @@ def _identify_regions(scores: list) -> dict:
     very_low = []   # <50
     
     for i, score in enumerate(scores):
-        if score > 90:
+        if score > PLDDT_VERY_HIGH:
             very_high.append(i + 1)  # 1-indexed for biology convention
-        elif score > 70:
+        elif score > PLDDT_HIGH:
             confident.append(i + 1)
-        elif score > 50:
+        elif score > PLDDT_LOW:
             low.append(i + 1)
         else:
             very_low.append(i + 1)
@@ -128,7 +142,7 @@ def _find_drug_target_regions(regions: dict) -> list:
     # Look for substantial high-confidence regions
     for start, end in regions["very_high"]["ranges"]:
         length = end - start + 1
-        if length >= 20:  # At least 20 residues
+        if length >= MIN_DOMAIN_RESIDUES:
             target_regions.append({
                 "start": start,
                 "end": end,
@@ -139,7 +153,7 @@ def _find_drug_target_regions(regions: dict) -> list:
     
     for start, end in regions["confident"]["ranges"]:
         length = end - start + 1
-        if length >= 30:  # Need longer stretch if only confident
+        if length >= MIN_BINDING_SITE_RESIDUES:
             target_regions.append({
                 "start": start,
                 "end": end,
@@ -156,11 +170,11 @@ def _interpret_fractions(metadata: dict) -> str:
     very_high = metadata.get("fractionPlddtVeryHigh", 0)
     very_low = metadata.get("fractionPlddtVeryLow", 0)
     
-    if very_high > 0.6:
+    if very_high > FRACTION_VERY_HIGH:
         quality = "excellent"
-    elif very_high > 0.4:
+    elif very_high > FRACTION_HIGH:
         quality = "good"
-    elif very_high > 0.2:
+    elif very_high > FRACTION_LOW:
         quality = "moderate"
     else:
         quality = "poor"
