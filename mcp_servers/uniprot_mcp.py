@@ -3,8 +3,14 @@ UniProt MCP Server
 Provides tools for searching and fetching protein data from UniProt.
 """
 
-import requests
+import sys
+import os
 from typing import Optional, List
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import requests
+from config.http_client import resilient_get
 
 UNIPROT_API = "https://rest.uniprot.org/uniprotkb"
 
@@ -40,8 +46,7 @@ def search_proteins(
     }
     
     try:
-        response = requests.get(url, params=params, timeout=15)
-        response.raise_for_status()
+        response = resilient_get(url, timeout_key="uniprot_search", params=params)
         data = response.json()
         
         results = []
@@ -76,12 +81,12 @@ def get_protein_details(uniprot_id: str) -> dict:
     url = f"{UNIPROT_API}/{uniprot_id}.json"
     
     try:
-        response = requests.get(url, timeout=15)
-        
-        if response.status_code == 404:
-            return {"error": f"Protein {uniprot_id} not found in UniProt"}
-        
-        response.raise_for_status()
+        try:
+            response = resilient_get(url, timeout_key="uniprot_annotation")
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                return {"error": f"Protein {uniprot_id} not found in UniProt"}
+            raise
         data = response.json()
         
         return {
