@@ -180,25 +180,24 @@ def run(question: str) -> dict:
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("QUERY AGENT TEST")
-    print("=" * 60)
-    
+    import logging as _logging
+    _logging.basicConfig(level=_logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     test_questions = [
         "Tell me about protein Q8I3H7",
         "Is Q8I3H7 a good drug target for malaria?",
         "What's the structure confidence for Q8I3H7?",
     ]
-    
+
     for q in test_questions:
-        print(f"\n📝 Question: {q}")
-        print("-" * 40)
+        logger.info("Question: %s", q)
         result = run(q)
-        print(f"Intent: {result.get('intent')}")
-        print(f"Summary: {result.get('summary')}")
+        logger.info("Intent: %s", result.get('intent'))
+        logger.info("Summary: %s", result.get('summary'))
         if result.get('proteins'):
             p = result['proteins'][0]
-            print(f"Confidence: {p.get('confidence', {}).get('overall', 'N/A')}")
+            logger.info("Confidence: %s", p.get('confidence', {}).get('overall', 'N/A'))
+
 
 # Quick test of confidence display
 def _test_confidence():
@@ -207,5 +206,5 @@ def _test_confidence():
         p = result['proteins'][0]
         if 'plddt_scores' in p:
             scores = p['plddt_scores']
-            print(f"Got {len(scores)} residue confidence scores")
-            print(f"Sample (first 5): {scores[:5]}")
+            logger.info("Got %d residue confidence scores", len(scores))
+            logger.info("Sample (first 5): %s", scores[:5])

@@ -6,6 +6,7 @@ Analyzes protein structure confidence and identifies key regions.
 import os
 import sys
 import json
+import logging
 from openai import AzureOpenAI
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,6 +21,8 @@ client = AzureOpenAI(
     max_retries=3,
 )
 MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+
+logger = logging.getLogger(__name__)
 
 
 def analyze_confidence_regions(uniprot_id: str) -> dict:
@@ -204,9 +207,7 @@ def generate_structure_report(uniprot_id: str) -> str:
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("STRUCTURE AGENT TEST")
-    print("=" * 60)
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     report = generate_structure_report("Q8I3H7")
-    print(report)
+    logger.info(report)

@@ -7,6 +7,7 @@ Includes self-reflection to identify gaps in reasoning.
 import os
 import sys
 import json
+import logging
 
 # Fix import paths
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,6 +24,8 @@ client = AzureOpenAI(
     max_retries=3,
 )
 MODEL = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+
+logger = logging.getLogger(__name__)
 
 
 REASONING_PROMPT = """You are the Reasoning Agent for Lyra, a protein research system.
@@ -98,7 +101,7 @@ INITIAL ASSESSMENT: {protein_summary.get('drug_target_assessment', 'Unknown')}
 """
     
     # Step 1: Initial reasoning
-    print("  → Calling LLM for reasoning...")
+    logger.info("Calling LLM for reasoning...")
     reasoning_response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -109,17 +112,17 @@ INITIAL ASSESSMENT: {protein_summary.get('drug_target_assessment', 'Unknown')}
     )
     
     raw_reasoning = reasoning_response.choices[0].message.content
-    print(f"  → Got response ({len(raw_reasoning)} chars)")
-    
+    logger.info("Got response (%d chars)", len(raw_reasoning))
+
     try:
         reasoning = parse_json_response(raw_reasoning)
     except json.JSONDecodeError as e:
-        print(f"  ⚠ JSON parse failed: {e}")
-        print(f"  Raw response preview: {raw_reasoning[:200]}...")
+        logger.warning("JSON parse failed: %s", e)
+        logger.debug("Raw response preview: %s...", raw_reasoning[:200])
         reasoning = {"raw_reasoning": raw_reasoning}
     
     # Step 2: Self-reflection
-    print("  → Calling LLM for self-reflection...")
+    logger.info("Calling LLM for self-reflection...")
     reflection_prompt = get_reflection_prompt(json.dumps(reasoning, indent=2))
     reflection_response = client.chat.completions.create(
         model=MODEL,
@@ -131,12 +134,12 @@ INITIAL ASSESSMENT: {protein_summary.get('drug_target_assessment', 'Unknown')}
     )
     
     raw_reflection = reflection_response.choices[0].message.content
-    print(f"  → Got response ({len(raw_reflection)} chars)")
-    
+    logger.info("Got response (%d chars)", len(raw_reflection))
+
     try:
         reflection = parse_json_response(raw_reflection)
     except json.JSONDecodeError as e:
-        print(f"  ⚠ JSON parse failed: {e}")
+        logger.warning("JSON parse failed: %s", e)
         reflection = {"raw_reflection": raw_reflection}
     
     return {
@@ -223,10 +226,7 @@ def generate_reasoning_report(uniprot_id: str) -> str:
 
 # Test
 if __name__ == "__main__":
-    print("=" * 60)
-    print("REASONING AGENT TEST")
-    print("=" * 60)
-    print()
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     report = generate_reasoning_report("Q8I3H7")
-    print(report)
+    logger.info(report)

@@ -5,12 +5,15 @@ Provides tools for querying AlphaFold protein structure database.
 
 import sys
 import os
+import logging
 from typing import Optional
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from config.http_client import resilient_get
+
+logger = logging.getLogger(__name__)
 
 ALPHAFOLD_BASE_URL = "https://alphafold.ebi.ac.uk/api"
 
@@ -129,14 +132,14 @@ def _assess_drug_target(metadata: dict) -> str:
 
 # Test the server
 if __name__ == "__main__":
-    print("Testing AlphaFold MCP Server...\n")
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
     # Test with malaria protein
     summary = summarize_protein("Q8I3H7")
-    
-    print(f"Protein: {summary['description']}")
-    print(f"Organism: {summary['organism']}")
-    print(f"Gene: {summary['gene']}")
-    print(f"Length: {summary['length']} residues")
-    print(f"Overall confidence: {summary['confidence']['overall']}")
-    print(f"Drug target assessment: {summary['drug_target_assessment']}")
+
+    logger.info("Protein: %s", summary['description'])
+    logger.info("Organism: %s", summary['organism'])
+    logger.info("Gene: %s", summary['gene'])
+    logger.info("Length: %s residues", summary['length'])
+    logger.info("Overall confidence: %s", summary['confidence']['overall'])
+    logger.info("Drug target assessment: %s", summary['drug_target_assessment'])

@@ -98,7 +98,7 @@ class LyraOrchestrator:
         
     def log(self, message: str):
         if self.verbose:
-            print(message)
+            logger.info(message)
     
     def plan(self, question: str) -> dict:
         """Phase 1: Plan the analysis based on the question."""
@@ -426,12 +426,13 @@ def analyze(question: str, verbose: bool = True) -> str:
 
 # Test
 if __name__ == "__main__":
-    print("═" * 60)
-    print("  LYRA ORCHESTRATOR TEST")
-    print("═" * 60)
-    
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logger.info("═" * 60)
+    logger.info("  LYRA ORCHESTRATOR TEST")
+    logger.info("═" * 60)
+
     # Test question
     question = "Is protein Q8I3H7 a viable drug target for malaria treatment?"
-    
+
     result = analyze(question)
-    print(result)
+    logger.info(result)
