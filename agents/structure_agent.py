@@ -167,8 +167,8 @@ def _find_drug_target_regions(regions: dict) -> list:
 
 def _interpret_fractions(metadata: dict) -> str:
     """Generate interpretation from fraction data."""
-    very_high = metadata.get("fractionPlddtVeryHigh", 0)
-    very_low = metadata.get("fractionPlddtVeryLow", 0)
+    very_high = metadata.get("fractionPlddtVeryHigh") or 0
+    very_low = metadata.get("fractionPlddtVeryLow") or 0
     
     if very_high > FRACTION_VERY_HIGH:
         quality = "excellent"
@@ -204,7 +204,7 @@ def generate_structure_report(uniprot_id: str) -> str:
     
     report = [
         f"## Structure Analysis: {uniprot_id}",
-        f"Overall confidence: {analysis['overall_confidence']:.1f}/100",
+        f"Overall confidence: {analysis['overall_confidence']:.1f}/100" if analysis.get('overall_confidence') is not None else "Overall confidence: N/A",
         f"",
         f"### Confidence Distribution",
         analysis["interpretation"],
