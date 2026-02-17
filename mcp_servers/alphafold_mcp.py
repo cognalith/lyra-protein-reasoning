@@ -67,7 +67,7 @@ def get_plddt_scores(uniprot_id: str) -> dict:
     return response.json()
 
 
-def search_proteins_by_organism(taxon_id: int, limit: int = 10) -> list:
+def search_proteins_by_organism(taxon_id: int, limit: int = 10) -> dict:
     """
     Search for proteins by organism taxonomy ID.
     
