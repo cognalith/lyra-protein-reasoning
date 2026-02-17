@@ -55,6 +55,16 @@ Lyra will:
 | **Confidence Calibration** | Confidence adjusted through critique (e.g., 0.85 → 0.65) |
 | **Magnetic Orchestration** | Orchestrator dynamically adjusts task list based on findings |
 
+## 🛡️ Resilience & Error Handling
+
+| Feature | Details |
+|---------|---------|
+| **Task Failure Isolation** | A failed protein doesn't crash the pipeline — remaining proteins complete successfully |
+| **Defensive Query Handling** | Input validation, type checking, and structured error returns from all MCP calls |
+| **HTTP Retry with Backoff** | Exponential backoff on 429/5xx errors; immediate fail on 4xx client errors |
+| **Centralized Timeouts** | All HTTP calls use configured timeouts via `config/http_config.py` |
+| **Structured Logging** | All modules use `logging.getLogger(__name__)` — no print statements |
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -73,7 +83,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install openai requests
+pip install -r requirements.txt
 ```
 
 ### Configuration
@@ -82,38 +92,56 @@ pip install openai requests
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-key-here"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+
+# Optional: override API version (defaults to 2024-02-15-preview)
+export AZURE_OPENAI_API_VERSION="2024-02-15-preview"
 ```
 
 ### Run Lyra
 ```bash
+# Interactive mode
 cd agents
-python3 orchestrator.py
+python3 lyra.py
+
+# Single question from command line
+python3 lyra.py "Is protein Q8I3H7 a viable drug target for malaria?"
+
+# Health check (verifies APIs + credentials)
+python3 -c "from lyra import health_check; health_check()"
 ```
 
 Or use in code:
 ```python
-from agents.orchestrator import analyze
+from agents.lyra import run_safe
 
-result = analyze("Is protein Q8I3H7 a viable drug target for malaria?")
-print(result)
+result = run_safe("Is protein Q8I3H7 a viable drug target for malaria?")
+if result["success"]:
+    print(result["result"])
 ```
 
 ## 📁 Project Structure
 ```
 lyra-protein-reasoning/
 ├── README.md
+├── requirements.txt
+├── test_agent.py             # Standalone smoke test
 ├── agents/
-│   ├── orchestrator.py      # Magnetic orchestration manager
-│   ├── query_agent.py       # Question parsing + protein fetching
-│   ├── structure_agent.py   # pLDDT analysis + druggable regions
-│   ├── reasoning_agent.py   # Multi-step reasoning + self-reflection
-│   ├── critic_agent.py      # Hypothesis verification + cross-referencing
-│   └── synthesis_agent.py   # Research brief compilation
+│   ├── lyra.py               # Main entry point (interactive + CLI)
+│   ├── orchestrator.py       # Magnetic orchestration manager
+│   ├── query_agent.py        # Question parsing + defensive protein fetching
+│   ├── structure_agent.py    # pLDDT analysis + druggable regions
+│   ├── reasoning_agent.py    # Multi-step reasoning + self-reflection
+│   ├── critic_agent.py       # Hypothesis verification + cross-referencing
+│   ├── synthesis_agent.py    # Research brief compilation
+│   └── test_proteins.py      # Multi-protein integration test
 ├── mcp_servers/
-│   └── alphafold_mcp.py     # AlphaFold API interface
-├── evaluation/              # Test questions + results (coming)
-├── docs/                    # Architecture docs (coming)
-└── demo/                    # Demo video (coming)
+│   ├── alphafold_mcp.py      # AlphaFold API interface
+│   └── uniprot_mcp.py        # UniProt API interface
+├── config/
+│   ├── http_config.py        # Centralized timeout + retry settings
+│   └── http_client.py        # Resilient HTTP client with backoff
+├── docs/                     # PRDs and architecture decisions
+└── demo/                     # Demo video (coming)
 ```
 
 ## 📊 Example Output
@@ -142,6 +170,7 @@ lyra-protein-reasoning/
 | Agent Framework | Custom Python orchestration |
 | LLM Backend | Azure OpenAI (GPT-4o) via Microsoft Foundry |
 | Protein Data | AlphaFold API + UniProt API |
+| HTTP Resilience | Custom retry client with exponential backoff |
 | Development | VS Code + AI Toolkit |
 
 ## 📅 Competition Timeline
